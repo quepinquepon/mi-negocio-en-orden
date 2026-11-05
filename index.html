@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0f766e" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="description" content="Administrá clientes, presupuestos, trabajos e ingresos de tu negocio independiente." />
+  
+  <title>Mi Negocio en Orden</title>
+  
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Pantalla de Activación de Licencia -->
+    <div id="license-screen" class="screen hidden">
+      <div class="license-card">
+        <div class="logo">📋</div>
+        <h1>Mi Negocio en Orden</h1>
+        <p class="subtitle">Activá tu licencia para empezar</p>
+        
+        <div class="form-group">
+          <label for="license-key">Clave de licencia</label>
+          <input 
+            type="text" 
+            id="license-key" 
+            placeholder="MNEO-XXXX-XXXX-XXXX-XXXX"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </div>
+        
+        <button id="btn-activate" class="btn btn-primary">Activar licencia</button>
+        <p id="license-error" class="error-msg hidden"></p>
+        
+        <div class="help-text">
+          <p>¿Compraste la app? Revisá el mensaje que te enviamos con tu clave.</p>
+          <p>¿Problemas? Escribinos por WhatsApp.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- App Principal -->
+    <div id="main-app" class="hidden">
+      <!-- Header -->
+      <header class="app-header">
+        <div class="header-left">
+          <h1 id="page-title">Inicio</h1>
+        </div>
+        <div class="header-right">
+          <button id="btn-menu" class="icon-btn" aria-label="Menú">☰</button>
+        </div>
+      </header>
+
+      <!-- Contenido -->
+      <main id="content">
+        <!-- Dashboard -->
+        <section id="view-dashboard" class="view">
+          <div class="stats-grid">
+            <div class="stat-card">
+              <span class="stat-label">Clientes</span>
+              <span class="stat-value" id="stat-clients">0</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Presupuestos</span>
+              <span class="stat-value" id="stat-budgets">0</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Ingresos mes</span>
+              <span class="stat-value" id="stat-income">$0</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Pendientes</span>
+              <span class="stat-value" id="stat-pending">0</span>
+            </div>
+          </div>
+
+          <div class="quick-actions">
+            <button class="btn btn-primary" data-action="new-client">+ Nuevo Cliente</button>
+            <button class="btn btn-secondary" data-action="new-budget">+ Nuevo Presupuesto</button>
+          </div>
+
+          <div class="recent-section">
+            <h2>Últimos presupuestos</h2>
+            <div id="recent-budgets" class="list"></div>
+          </div>
+        </section>
+
+        <!-- Clientes -->
+        <section id="view-clients" class="view hidden">
+          <div class="view-header">
+            <input type="search" id="search-clients" placeholder="Buscar cliente..." class="search-input" />
+            <button class="btn btn-primary btn-sm" data-action="new-client">+ Nuevo</button>
+          </div>
+          <div id="clients-list" class="list"></div>
+        </section>
+
+        <!-- Presupuestos -->
+        <section id="view-budgets" class="view hidden">
+          <div class="view-header">
+            <input type="search" id="search-budgets" placeholder="Buscar presupuesto..." class="search-input" />
+            <button class="btn btn-primary btn-sm" data-action="new-budget">+ Nuevo</button>
+          </div>
+          <div id="budgets-list" class="list"></div>
+        </section>
+
+        <!-- Ingresos / Gastos -->
+        <section id="view-finance" class="view hidden">
+          <div class="view-header">
+            <div class="tabs">
+              <button class="tab active" data-tab="income">Ingresos</button>
+              <button class="tab" data-tab="expense">Gastos</button>
+            </div>
+            <button class="btn btn-primary btn-sm" data-action="new-transaction">+ Nuevo</button>
+          </div>
+          <div id="finance-list" class="list"></div>
+        </section>
+
+        <!-- Configuración -->
+        <section id="view-settings" class="view hidden">
+          <div class="settings-card">
+            <h2>Datos del negocio</h2>
+            <div class="form-group">
+              <label>Nombre del negocio</label>
+              <input type="text" id="business-name" placeholder="Ej: Electricidad Gómez" />
+            </div>
+            <div class="form-group">
+              <label>Teléfono / WhatsApp</label>
+              <input type="tel" id="business-phone" placeholder="11 1234-5678" />
+            </div>
+            <div class="form-group">
+              <label>Email</label>
+              <input type="email" id="business-email" placeholder="contacto@negocio.com" />
+            </div>
+            <button id="btn-save-settings" class="btn btn-primary">Guardar</button>
+          </div>
+
+          <div class="settings-card">
+            <h2>Licencia</h2>
+            <p id="license-info">Licencia activada</p>
+            <button id="btn-reset-license" class="btn btn-danger btn-sm">Cambiar licencia</button>
+          </div>
+
+          <div class="settings-card">
+            <h2>Datos</h2>
+            <button id="btn-export" class="btn btn-secondary btn-sm">Exportar datos (JSON)</button>
+            <button id="btn-clear-data" class="btn btn-danger btn-sm">Borrar todos los datos</button>
+          </div>
+        </section>
+      </main>
+
+      <!-- Bottom Navigation -->
+      <nav class="bottom-nav">
+        <button class="nav-item active" data-view="dashboard">
+          <span class="nav-icon">🏠</span>
+          <span class="nav-label">Inicio</span>
+        </button>
+        <button class="nav-item" data-view="clients">
+          <span class="nav-icon">👥</span>
+          <span class="nav-label">Clientes</span>
+        </button>
+        <button class="nav-item" data-view="budgets">
+          <span class="nav-icon">📄</span>
+          <span class="nav-label">Presupuestos</span>
+        </button>
+        <button class="nav-item" data-view="finance">
+          <span class="nav-icon">💰</span>
+          <span class="nav-label">Caja</span>
+        </button>
+        <button class="nav-item" data-view="settings">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-label">Ajustes</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- Modal genérico -->
+    <div id="modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="modal-title">Título</h2>
+          <button id="modal-close" class="icon-btn">✕</button>
+        </div>
+        <div id="modal-body" class="modal-body"></div>
+        <div class="modal-footer">
+          <button id="modal-cancel" class="btn btn-secondary">Cancelar</button>
+          <button id="modal-save" class="btn btn-primary">Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/storage.js"></script>
+  <script src="js/license.js"></script>
+  <script src="js/app.js"></script>
+  
+  <script>
+    // Registrar Service Worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(reg => console.log('SW registrado', reg.scope))
+          .catch(err => console.log('Error SW', err));
+      });
+    }
+  </script>
+</body>
+</html>

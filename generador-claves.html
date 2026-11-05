@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Generador de Claves — Mi Negocio en Orden</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f1f5f9;
+      color: #0f172a;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 16px;
+      padding: 28px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+    h1 {
+      font-size: 1.4rem;
+      color: #0f766e;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      color: #64748b;
+      margin-bottom: 24px;
+      font-size: 0.95rem;
+    }
+    .controls {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    input[type="number"] {
+      width: 80px;
+      padding: 10px 12px;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 1rem;
+    }
+    button {
+      padding: 10px 18px;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      background: #0f766e;
+      color: white;
+    }
+    button:active { transform: scale(0.98); }
+    button.secondary {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+    #keys-output {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 16px;
+      min-height: 200px;
+      font-family: monospace;
+      font-size: 0.95rem;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .hint {
+      margin-top: 16px;
+      font-size: 0.85rem;
+      color: #64748b;
+    }
+    .warning {
+      background: #fef3c7;
+      border: 1px solid #fbbf24;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 20px;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔑 Generador de Claves</h1>
+    <p class="subtitle">Solo para vos (el vendedor). No subas este archivo a GitHub Pages público si no querés.</p>
+
+    <div class="warning">
+      <strong>Importante:</strong> Guardá las claves que generes. Cada clave solo se puede usar en un dispositivo (se guarda localmente). Anotá a quién se la diste.
+    </div>
+
+    <div class="controls">
+      <label>
+        Cantidad:
+        <input type="number" id="count" value="10" min="1" max="100" />
+      </label>
+      <button id="btn-generate">Generar claves</button>
+      <button id="btn-copy" class="secondary">Copiar todas</button>
+    </div>
+
+    <div id="keys-output">Las claves aparecerán acá...</div>
+
+    <p class="hint">
+      Formato: MNEO-XXXX-XXXX-XXXX-XXXX<br>
+      Cada clave es única y válida offline.<br>
+      Cuando un cliente te pague, generá una clave nueva y mandásela junto con el link de la app.
+    </p>
+  </div>
+
+  <script src="js/license.js"></script>
+  <script>
+    document.getElementById('btn-generate').addEventListener('click', () => {
+      const count = Number(document.getElementById('count').value) || 10;
+      const keys = License.generateKeys(count);
+      document.getElementById('keys-output').textContent = keys.join('\n');
+    });
+
+    document.getElementById('btn-copy').addEventListener('click', () => {
+      const text = document.getElementById('keys-output').textContent;
+      if (text.includes('aparecerán')) return;
+      navigator.clipboard.writeText(text).then(() => {
+        alert('Claves copiadas al portapapeles');
+      });
+    });
+
+    // Generate some on load
+    document.getElementById('btn-generate').click();
+  </script>
+</body>
+</html>
