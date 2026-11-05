@@ -56,7 +56,17 @@ const App = {
       if (action === 'new-client') this.openClientModal();
       if (action === 'new-budget') this.openBudgetModal();
       if (action === 'new-transaction') this.openTransactionModal();
+      if (action === 'new-product') InventoryUI.openProductModal();
+      if (action === 'new-purchase') {
+        const products = Storage.getProducts();
+        if (!products.length) return alert('Primero creá un producto');
+        InventoryUI.openPurchaseModal(products[0].id);
+      }
+      if (action === 'new-sale') InventoryUI.openSaleModal();
+      if (action === 'pdf-products') InventoryUI.pdfProductList();
     });
+
+    if (typeof InventoryUI !== 'undefined') InventoryUI.bind();
 
     // Search
     document.getElementById('search-clients')?.addEventListener('input', (e) => {
@@ -123,6 +133,10 @@ const App = {
     // Update title
     const titles = {
       dashboard: 'Inicio',
+      products: 'Productos',
+      sales: 'Ventas',
+      people: 'Contactos',
+      more: 'Más',
       clients: 'Clientes',
       budgets: 'Presupuestos',
       finance: 'Caja',
@@ -140,12 +154,17 @@ const App = {
     if (view === 'budgets') this.renderBudgets();
     if (view === 'finance') this.renderFinance('income');
     if (view === 'settings') this.loadSettings();
+    if (view === 'products') InventoryUI.renderProducts();
+    if (view === 'sales') InventoryUI.renderSales();
+    if (view === 'people') InventoryUI.renderPeople();
+    if (view === 'more') InventoryUI.renderMoreStats();
   },
 
   refreshDashboard() {
     const clients = Storage.getClients();
     const budgets = Storage.getBudgets();
     const txs = Storage.getTransactions();
+    const settings = Storage.getSettings();
 
     const now = new Date();
     const thisMonthIncome = txs
@@ -158,6 +177,27 @@ const App = {
     document.getElementById('stat-budgets').textContent = budgets.length;
     document.getElementById('stat-income').textContent = this.formatMoney(thisMonthIncome);
     document.getElementById('stat-pending').textContent = pending;
+
+    const hero = document.getElementById('hero-greeting');
+    const heroSub = document.getElementById('hero-sub');
+    if (hero) {
+      const name = settings.businessName || '';
+      hero.textContent = name ? `Hola, ${name} 👋` : 'Hola 👋';
+    }
+    if (heroSub) {
+      const inv = Storage.getStats();
+      if (inv.lowStock > 0) {
+        heroSub.textContent = `⚠️ ${inv.lowStock} producto(s) con stock bajo · Ganancia mes ${this.formatMoney(inv.totalProfit)}`;
+      } else if (inv.expiring > 0) {
+        heroSub.textContent = `🗓️ ${inv.expiring} lote(s) por vencer · Ventas mes ${this.formatMoney(inv.totalSales)}`;
+      } else if (pending > 0) {
+        heroSub.textContent = `Tenés ${pending} presupuesto${pending > 1 ? 's' : ''} pendiente${pending > 1 ? 's' : ''} de respuesta`;
+      } else if (budgets.length === 0 && inv.tickets === 0) {
+        heroSub.textContent = 'Cargá productos, registrá compras y empezá a vender';
+      } else {
+        heroSub.textContent = `Ventas del mes ${this.formatMoney(inv.totalSales)} · Ganancia ${this.formatMoney(inv.totalProfit)}`;
+      }
+    }
 
     // Recent budgets
     const recent = budgets.slice(0, 5);
@@ -176,6 +216,18 @@ const App = {
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           this.generateBudgetPDF(btn.dataset.pdfBudget);
+        });
+      });
+      container.querySelectorAll('[data-mail-budget]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.sendBudgetEmail(btn.dataset.mailBudget);
+        });
+      });
+      container.querySelectorAll('[data-share-budget]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.shareBudget(btn.dataset.shareBudget);
         });
       });
     }
@@ -251,6 +303,18 @@ const App = {
         this.generateBudgetPDF(btn.dataset.pdfBudget);
       });
     });
+    container.querySelectorAll('[data-mail-budget]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.sendBudgetEmail(btn.dataset.mailBudget);
+      });
+    });
+    container.querySelectorAll('[data-share-budget]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.shareBudget(btn.dataset.shareBudget);
+      });
+    });
   },
 
 
@@ -269,14 +333,17 @@ const App = {
           <div class="list-item-sub">
             <span class="badge ${statusClass}">${statusLabels[b.status] || 'Borrador'}</span>
             · ${this.formatDate(b.createdAt)}
+            ${b.validUntil ? ' · Válido hasta ' + this.formatDate(b.validUntil) : ''}
+          </div>
+          <div class="action-bar">
+            <button class="btn-icon-label pdf" data-pdf-budget="${b.id}">📄 PDF</button>
+            <button class="btn-icon-label mail" data-mail-budget="${b.id}">✉️ Mail</button>
+            <button class="btn-icon-label whatsapp" data-share-budget="${b.id}">📤 Enviar</button>
+            <button class="btn-icon-label" data-edit-budget="${b.id}">✏️ Editar</button>
           </div>
         </div>
         <div class="list-item-right">
           <div class="amount">${this.formatMoney(b.total || 0)}</div>
-          <div class="item-actions">
-            <button class="icon-btn" data-pdf-budget="${b.id}" title="Generar PDF">📄</button>
-            <button class="icon-btn" data-edit-budget="${b.id}" title="Editar">✏️</button>
-          </div>
         </div>
       </div>
     `;
@@ -396,8 +463,21 @@ const App = {
         <span>Total</span>
         <span id="budget-total">$0</span>
       </div>
+      <div class="form-group" style="margin-top:16px">
+        <label>Válido hasta</label>
+        <input type="date" id="f-valid" value="${budget.validUntil || ''}" />
+        <p class="field-hint">Opcional. Fecha de vencimiento del presupuesto.</p>
+      </div>
+      <div class="form-group">
+        <label>Notas / condiciones</label>
+        <textarea id="f-notes-budget" rows="3" placeholder="Forma de pago, materiales, plazos, observaciones...">${this.escape(budget.notes || '')}</textarea>
+      </div>
       ${id ? `
-        <button type="button" id="btn-pdf-item" class="btn btn-secondary" style="margin-top:16px">📄 Generar PDF</button>
+        <div class="budget-actions-row">
+          <button type="button" id="btn-pdf-item" class="btn btn-secondary">📄 PDF</button>
+          <button type="button" id="btn-mail-item" class="btn btn-secondary">✉️ Mail</button>
+          <button type="button" id="btn-share-item" class="btn btn-primary">📤 Enviar</button>
+        </div>
         <button type="button" id="btn-delete-item" class="btn btn-danger" style="margin-top:8px">Eliminar presupuesto</button>
       ` : ''}
     `;
@@ -442,9 +522,9 @@ const App = {
     this.updateBudgetTotal();
 
     if (id) {
-      document.getElementById('btn-pdf-item')?.addEventListener('click', () => {
-        this.generateBudgetPDF(id);
-      });
+      document.getElementById('btn-pdf-item')?.addEventListener('click', () => this.generateBudgetPDF(id));
+      document.getElementById('btn-mail-item')?.addEventListener('click', () => this.sendBudgetEmail(id));
+      document.getElementById('btn-share-item')?.addEventListener('click', () => this.shareBudget(id));
       document.getElementById('btn-delete-item').addEventListener('click', () => {
         if (confirm('¿Eliminar este presupuesto?')) {
           Storage.deleteBudget(id);
@@ -531,12 +611,17 @@ const App = {
 
       const total = items.reduce((sum, i) => sum + (i.qty * i.price), 0);
 
+      const validUntil = document.getElementById('f-valid')?.value || '';
+      const notes = document.getElementById('f-notes-budget')?.value?.trim() || '';
+
       const data = {
         clientId: clientId || null,
         clientName: client ? client.name : 'Sin cliente',
         status,
         items,
-        total
+        total,
+        validUntil,
+        notes
       };
 
       if (this.editingId) {
@@ -562,6 +647,13 @@ const App = {
       this.renderFinance(type);
       this.refreshDashboard();
     }
+
+    if (this.editingType === 'product') InventoryUI.saveProduct();
+    if (this.editingType === 'purchase') InventoryUI.savePurchase();
+    if (this.editingType === 'sale') InventoryUI.saveSale();
+    if (this.editingType === 'supplier') InventoryUI.saveSupplier();
+    if (this.editingType === 'seller') InventoryUI.saveSeller();
+    if (this.editingType === 'debt') InventoryUI.saveDebtPayment();
   },
 
   // Settings
@@ -604,8 +696,125 @@ const App = {
     this.renderFinance('income');
   },
 
+  // ========== ENVIAR / COMPARTIR PRESUPUESTO ==========
+  _budgetSummaryText(budget, settings) {
+    const lines = [];
+    lines.push(`Presupuesto N° ${budget.number || '—'}`);
+    lines.push(`Cliente: ${budget.clientName || 'Sin cliente'}`);
+    lines.push(`Total: ${this.formatMoney(budget.total || 0)}`);
+    if (budget.validUntil) lines.push(`Válido hasta: ${this.formatDate(budget.validUntil)}`);
+    lines.push('');
+    (budget.items || []).forEach(it => {
+      const sub = (Number(it.qty) || 0) * (Number(it.price) || 0);
+      lines.push(`• ${it.desc || 'Ítem'} x${it.qty || 1} = ${this.formatMoney(sub)}`);
+    });
+    if (budget.notes) {
+      lines.push('');
+      lines.push('Notas: ' + budget.notes);
+    }
+    lines.push('');
+    lines.push(settings.businessName || 'Mi Negocio en Orden');
+    if (settings.phone) lines.push('Tel: ' + settings.phone);
+    if (settings.email) lines.push('Email: ' + settings.email);
+    return lines.join('\n');
+  },
+
+  async _buildPdfBlob(budgetId) {
+    // Genera el PDF y devuelve { blob, fileName, budget, settings }
+    const budget = Storage.getBudgets().find(b => b.id === budgetId);
+    if (!budget) return null;
+    const settings = Storage.getSettings();
+
+    // Reutilizamos la lógica generando a blob
+    const { jsPDF } = window.jspdf;
+    if (!jsPDF) {
+      alert('No se pudo cargar el generador de PDF. Revisá tu conexión.');
+      return null;
+    }
+
+    // Llamamos a generateBudgetPDF en modo blob
+    return this.generateBudgetPDF(budgetId, { returnBlob: true });
+  },
+
+  async sendBudgetEmail(budgetId) {
+    const budget = Storage.getBudgets().find(b => b.id === budgetId);
+    if (!budget) return alert('No se encontró el presupuesto');
+
+    const settings = Storage.getSettings();
+    const client = Storage.getClients().find(c => c.id === budget.clientId);
+    const to = (client && client.email) ? client.email : '';
+    const subject = encodeURIComponent(
+      `Presupuesto N° ${budget.number || ''} — ${settings.businessName || 'Mi Negocio'}`
+    );
+    const body = encodeURIComponent(
+      this._budgetSummaryText(budget, settings) +
+      '\n\n---\nAdjuntá el PDF descargado desde la app si hace falta.\n(Podés tocar "PDF" antes de enviar el mail)'
+    );
+
+    // Descargar PDF automáticamente para que el usuario lo adjunte
+    this.generateBudgetPDF(budgetId);
+
+    // Abrir cliente de correo
+    setTimeout(() => {
+      window.location.href = `mailto:${to}?subject=${subject}&body=${body}`;
+    }, 400);
+
+    // Marcar como enviado
+    if (budget.status === 'draft') {
+      Storage.updateBudget(budgetId, { status: 'sent' });
+      this.renderBudgets();
+      this.refreshDashboard();
+    }
+  },
+
+  async shareBudget(budgetId) {
+    const budget = Storage.getBudgets().find(b => b.id === budgetId);
+    if (!budget) return alert('No se encontró el presupuesto');
+
+    const settings = Storage.getSettings();
+    const text = this._budgetSummaryText(budget, settings);
+    const title = `Presupuesto N° ${budget.number || ''} — ${settings.businessName || 'Mi Negocio'}`;
+
+    // Intentar compartir con Web Share API (ideal en celular: WhatsApp, Gmail, etc.)
+    try {
+      const result = await this.generateBudgetPDF(budgetId, { returnBlob: true });
+      if (result && result.blob && navigator.share) {
+        const file = new File([result.blob], result.fileName, { type: 'application/pdf' });
+        const shareData = { title, text, files: [file] };
+        if (navigator.canShare && navigator.canShare(shareData)) {
+          await navigator.share(shareData);
+        } else {
+          await navigator.share({ title, text });
+        }
+      } else if (navigator.share) {
+        await navigator.share({ title, text });
+      } else {
+        // Fallback escritorio: copiar texto + descargar PDF
+        this.generateBudgetPDF(budgetId);
+        if (navigator.clipboard) {
+          await navigator.clipboard.writeText(text);
+          alert('Resumen copiado al portapapeles y PDF descargado. Pegalo donde quieras enviarlo.');
+        } else {
+          alert('PDF descargado. Compartilo desde tu carpeta de descargas.');
+        }
+      }
+
+      if (budget.status === 'draft') {
+        Storage.updateBudget(budgetId, { status: 'sent' });
+        this.renderBudgets();
+        this.refreshDashboard();
+      }
+    } catch (err) {
+      if (err && err.name === 'AbortError') return; // usuario canceló
+      console.error(err);
+      // Fallback
+      this.generateBudgetPDF(budgetId);
+      alert('Se descargó el PDF. Podés enviarlo por WhatsApp o mail desde tu galería de archivos.');
+    }
+  },
+
   // ========== GENERAR PDF DE PRESUPUESTO ==========
-  generateBudgetPDF(budgetId) {
+  generateBudgetPDF(budgetId, options = {}) {
     const budget = Storage.getBudgets().find(b => b.id === budgetId);
     if (!budget) {
       alert('No se encontró el presupuesto');
@@ -772,9 +981,39 @@ const App = {
     doc.text('Documento generado con Mi Negocio en Orden', pageWidth / 2, footerY, { align: 'center' });
     doc.text('Este presupuesto no es una factura', pageWidth / 2, footerY + 5, { align: 'center' });
 
-    // Descargar
-    const fileName = `Presupuesto_${budget.number || 'S-N'}_${(budget.clientName || 'cliente').replace(/\s+/g, '_')}.pdf`;
+    // Notas
+    if (budget.notes) {
+      y += 10;
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...dark);
+      doc.text('Notas / condiciones', margin, y);
+      y += 5;
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...muted);
+      const noteLines = doc.splitTextToSize(budget.notes, pageWidth - margin * 2);
+      doc.text(noteLines, margin, y);
+    }
+
+    // Validez
+    if (budget.validUntil) {
+      y += 12;
+      doc.setFontSize(9);
+      doc.setTextColor(...muted);
+      doc.text('Válido hasta: ' + this.formatDate(budget.validUntil), margin, y);
+    }
+
+    // Descargar o devolver blob
+    const safeClient = (budget.clientName || 'cliente').replace(/\s+/g, '_').replace(/[^\w\-]/g, '');
+    const fileName = `Presupuesto_${budget.number || 'SN'}_${safeClient}.pdf`;
+
+    if (options && options.returnBlob) {
+      const blob = doc.output('blob');
+      return { blob, fileName, budget, settings };
+    }
+
     doc.save(fileName);
+    return null;
   },
 
   // Helpers

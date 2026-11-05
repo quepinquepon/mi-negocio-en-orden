@@ -1,9 +1,10 @@
-const CACHE_NAME = 'mneo-v4';
+const CACHE_NAME = 'mneo-v7';
 const ASSETS = [
   './',
   './index.html',
   './css/styles.css',
   './js/storage.js',
+  './js/inventory.js',
   './js/license.js',
   './js/app.js',
   './manifest.json',

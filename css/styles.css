@@ -592,3 +592,156 @@ html, body {
     grid-template-columns: repeat(4, 1fr);
   }
 }
+
+/* ===== UI RICA v2 ===== */
+.app-header {
+  background: linear-gradient(135deg, #0f766e 0%, #115e59 100%);
+}
+
+.stat-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::after {
+  content: '';
+  position: absolute;
+  right: -8px;
+  bottom: -8px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(15, 118, 110, 0.08);
+}
+
+.list-item {
+  border-left: 3px solid transparent;
+}
+
+.list-item:active {
+  border-left-color: var(--primary);
+}
+
+.action-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.btn-icon-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: #f1f5f9;
+  color: var(--text);
+}
+
+.btn-icon-label.primary {
+  background: var(--primary);
+  color: white;
+}
+
+.btn-icon-label.whatsapp {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.btn-icon-label.mail {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.btn-icon-label.pdf {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.section-title {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin: 20px 0 10px;
+  font-weight: 700;
+}
+
+.chip-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.chip {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: #f1f5f9;
+  color: var(--text-muted);
+  border: none;
+  cursor: pointer;
+}
+
+.chip.active {
+  background: var(--primary);
+  color: white;
+}
+
+.hero-card {
+  background: linear-gradient(135deg, #0f766e, #0d9488);
+  color: white;
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-lg);
+}
+
+.hero-card h2 {
+  font-size: 1.15rem;
+  margin-bottom: 4px;
+}
+
+.hero-card p {
+  opacity: 0.9;
+  font-size: 0.9rem;
+}
+
+.field-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.budget-actions-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.budget-actions-row .btn {
+  flex: 1;
+  min-width: 120px;
+  width: auto;
+}
+
+.alerts-box { margin-bottom: 10px; }
+.alert {
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.alert-warn { background: #fef3c7; color: #92400e; }
+.alert-danger { background: #fee2e2; color: #991b1b; }
+
+.bottom-nav .nav-label { font-size: 0.65rem; }
