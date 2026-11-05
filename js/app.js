@@ -166,8 +166,21 @@ const App = {
       container.innerHTML = `<div class="empty-state"><div class="icon">📄</div><p>Todavía no hay presupuestos</p></div>`;
     } else {
       container.innerHTML = recent.map(b => this.budgetItemHTML(b)).join('');
+      container.querySelectorAll('[data-edit-budget]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.openBudgetModal(btn.dataset.editBudget);
+        });
+      });
+      container.querySelectorAll('[data-pdf-budget]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.generateBudgetPDF(btn.dataset.pdfBudget);
+        });
+      });
     }
   },
+
 
   renderClients(filter = '') {
     let clients = Storage.getClients();
@@ -231,7 +244,15 @@ const App = {
         this.openBudgetModal(btn.dataset.editBudget);
       });
     });
+
+    container.querySelectorAll('[data-pdf-budget]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.generateBudgetPDF(btn.dataset.pdfBudget);
+      });
+    });
   },
+
 
   budgetItemHTML(b) {
     const statusLabels = {
@@ -252,11 +273,15 @@ const App = {
         </div>
         <div class="list-item-right">
           <div class="amount">${this.formatMoney(b.total || 0)}</div>
-          <button class="icon-btn" data-edit-budget="${b.id}">✏️</button>
+          <div class="item-actions">
+            <button class="icon-btn" data-pdf-budget="${b.id}" title="Generar PDF">📄</button>
+            <button class="icon-btn" data-edit-budget="${b.id}" title="Editar">✏️</button>
+          </div>
         </div>
       </div>
     `;
   },
+
 
   renderFinance(type = 'income') {
     const txs = Storage.getTransactions().filter(t => t.type === type);
@@ -371,8 +396,12 @@ const App = {
         <span>Total</span>
         <span id="budget-total">$0</span>
       </div>
-      ${id ? '<button type="button" id="btn-delete-item" class="btn btn-danger" style="margin-top:16px">Eliminar presupuesto</button>' : ''}
+      ${id ? `
+        <button type="button" id="btn-pdf-item" class="btn btn-secondary" style="margin-top:16px">📄 Generar PDF</button>
+        <button type="button" id="btn-delete-item" class="btn btn-danger" style="margin-top:8px">Eliminar presupuesto</button>
+      ` : ''}
     `;
+
 
     // Render items
     const renderItems = (items) => {
@@ -413,6 +442,9 @@ const App = {
     this.updateBudgetTotal();
 
     if (id) {
+      document.getElementById('btn-pdf-item')?.addEventListener('click', () => {
+        this.generateBudgetPDF(id);
+      });
       document.getElementById('btn-delete-item').addEventListener('click', () => {
         if (confirm('¿Eliminar este presupuesto?')) {
           Storage.deleteBudget(id);
@@ -423,6 +455,7 @@ const App = {
       });
     }
   },
+
 
   updateBudgetTotal() {
     const rows = document.querySelectorAll('.item-row');
@@ -571,9 +604,183 @@ const App = {
     this.renderFinance('income');
   },
 
+  // ========== GENERAR PDF DE PRESUPUESTO ==========
+  generateBudgetPDF(budgetId) {
+    const budget = Storage.getBudgets().find(b => b.id === budgetId);
+    if (!budget) {
+      alert('No se encontró el presupuesto');
+      return;
+    }
+
+    const settings = Storage.getSettings();
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 18;
+    let y = 20;
+
+    // Colores
+    const primary = [15, 118, 110]; // #0f766e
+    const dark = [15, 23, 42];
+    const muted = [100, 116, 139];
+
+    // Header barra
+    doc.setFillColor(...primary);
+    doc.rect(0, 0, pageWidth, 28, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text(settings.businessName || 'Mi Negocio en Orden', margin, 14);
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    let headerInfo = [];
+    if (settings.phone) headerInfo.push(settings.phone);
+    if (settings.email) headerInfo.push(settings.email);
+    if (headerInfo.length) {
+      doc.text(headerInfo.join('  ·  '), margin, 22);
+    }
+
+    y = 40;
+
+    // Título
+    doc.setTextColor(...dark);
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text('PRESUPUESTO', margin, y);
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...muted);
+    doc.text(`N° ${budget.number || '—'}`, pageWidth - margin, y, { align: 'right' });
+
+    y += 8;
+    doc.setFontSize(9);
+    doc.text(`Fecha: ${this.formatDate(budget.createdAt)}`, pageWidth - margin, y, { align: 'right' });
+
+    y += 12;
+
+    // Cliente
+    doc.setDrawColor(226, 232, 240);
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(margin, y, pageWidth - margin * 2, 18, 2, 2, 'FD');
+
+    doc.setTextColor(...muted);
+    doc.setFontSize(8);
+    doc.text('CLIENTE', margin + 4, y + 6);
+
+    doc.setTextColor(...dark);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text(budget.clientName || 'Sin cliente', margin + 4, y + 13);
+
+    y += 28;
+
+    // Tabla de ítems
+    const colDesc = margin;
+    const colQty = pageWidth - margin - 70;
+    const colPrice = pageWidth - margin - 40;
+    const colSub = pageWidth - margin;
+
+    // Header tabla
+    doc.setFillColor(...primary);
+    doc.rect(margin, y, pageWidth - margin * 2, 8, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.text('DESCRIPCIÓN', colDesc + 2, y + 5.5);
+    doc.text('CANT.', colQty, y + 5.5, { align: 'right' });
+    doc.text('P.UNIT.', colPrice, y + 5.5, { align: 'right' });
+    doc.text('SUBTOTAL', colSub - 2, y + 5.5, { align: 'right' });
+
+    y += 10;
+
+    // Ítems
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...dark);
+    doc.setFontSize(9);
+
+    const items = budget.items || [];
+    items.forEach((item, idx) => {
+      if (y > 260) {
+        doc.addPage();
+        y = 20;
+      }
+
+      const qty = Number(item.qty) || 0;
+      const price = Number(item.price) || 0;
+      const sub = qty * price;
+
+      // Fondo alternado
+      if (idx % 2 === 0) {
+        doc.setFillColor(248, 250, 252);
+        doc.rect(margin, y - 4, pageWidth - margin * 2, 9, 'F');
+      }
+
+      const desc = item.desc || '—';
+      // Truncar descripción si es muy larga
+      const maxDescWidth = colQty - colDesc - 8;
+      let displayDesc = desc;
+      while (doc.getTextWidth(displayDesc) > maxDescWidth && displayDesc.length > 3) {
+        displayDesc = displayDesc.slice(0, -4) + '...';
+      }
+
+      doc.text(displayDesc, colDesc + 2, y + 2);
+      doc.text(String(qty), colQty, y + 2, { align: 'right' });
+      doc.text(this.formatMoney(price), colPrice, y + 2, { align: 'right' });
+      doc.text(this.formatMoney(sub), colSub - 2, y + 2, { align: 'right' });
+
+      y += 9;
+    });
+
+    y += 6;
+
+    // Total
+    doc.setDrawColor(...primary);
+    doc.setLineWidth(0.5);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 8;
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...dark);
+    doc.text('TOTAL', colPrice - 10, y, { align: 'right' });
+    doc.setTextColor(...primary);
+    doc.text(this.formatMoney(budget.total || 0), colSub - 2, y, { align: 'right' });
+
+    y += 16;
+
+    // Estado
+    const statusLabels = {
+      draft: 'Borrador',
+      sent: 'Enviado',
+      accepted: 'Aceptado',
+      rejected: 'Rechazado'
+    };
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...muted);
+    doc.text(`Estado: ${statusLabels[budget.status] || 'Borrador'}`, margin, y);
+
+    // Footer
+    const footerY = doc.internal.pageSize.getHeight() - 15;
+    doc.setFontSize(8);
+    doc.setTextColor(...muted);
+    doc.text('Documento generado con Mi Negocio en Orden', pageWidth / 2, footerY, { align: 'center' });
+    doc.text('Este presupuesto no es una factura', pageWidth / 2, footerY + 5, { align: 'center' });
+
+    // Descargar
+    const fileName = `Presupuesto_${budget.number || 'S-N'}_${(budget.clientName || 'cliente').replace(/\s+/g, '_')}.pdf`;
+    doc.save(fileName);
+  },
+
   // Helpers
   formatMoney(n) {
     return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
+
   },
 
   formatDate(iso) {

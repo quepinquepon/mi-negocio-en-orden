@@ -63,8 +63,9 @@ html, body {
 }
 
 .license-card .logo {
-  font-size: 48px;
   margin-bottom: 12px;
+  display: flex;
+  justify-content: center;
 }
 
 .license-card h1 {
@@ -316,6 +317,20 @@ html, body {
 .list-item-right {
   text-align: right;
   margin-left: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.item-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.item-actions .icon-btn {
+  font-size: 1.15rem;
+  padding: 4px 6px;
 }
 
 .badge {
