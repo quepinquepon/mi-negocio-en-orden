@@ -21,7 +21,7 @@
 <body>
   <div id="app">
     <!-- Pantalla de Activación de Licencia -->
-    <div id="license-screen" class="screen hidden">
+    <div id="license-screen" class="screen">
       <div class="license-card">
         <div class="logo">
           <svg width="56" height="56" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -210,14 +210,67 @@
   <script src="js/license.js"></script>
   <script src="js/app.js"></script>
   
+  <!-- Banner de actualización -->
+  <div id="update-banner" style="display:none; position:fixed; bottom:80px; left:12px; right:12px; z-index:999; background:#0f766e; color:white; padding:14px 16px; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.25); font-family:sans-serif; font-size:15px; display:none; align-items:center; justify-content:space-between; gap:12px;">
+    <span>Hay una nueva versión disponible</span>
+    <button id="btn-update-app" style="background:white; color:#0f766e; border:none; padding:8px 14px; border-radius:8px; font-weight:700; font-size:14px; cursor:pointer; white-space:nowrap;">Actualizar</button>
+  </div>
+
   <script>
-    // Registrar Service Worker
+    // Registrar Service Worker con actualización automática
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-          .then(reg => console.log('SW registrado', reg.scope))
-          .catch(err => console.log('Error SW', err));
+      let refreshing = false;
+
+      // Cuando el nuevo SW toma el control → recargar la app
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (refreshing) return;
+        refreshing = true;
+        window.location.reload();
       });
+
+      window.addEventListener('load', async () => {
+        try {
+          const reg = await navigator.serviceWorker.register('./sw.js');
+          console.log('SW registrado', reg.scope);
+
+          // Buscar actualizaciones al abrir la app
+          reg.update();
+
+          // Cada 60 segundos revisar si hay versión nueva
+          setInterval(() => reg.update(), 60 * 1000);
+
+          // Si ya hay un SW esperando
+          if (reg.waiting) {
+            showUpdateBanner(reg);
+          }
+
+          // Cuando aparece una versión nueva
+          reg.addEventListener('updatefound', () => {
+            const newWorker = reg.installing;
+            if (!newWorker) return;
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                showUpdateBanner(reg);
+              }
+            });
+          });
+        } catch (err) {
+          console.log('Error SW', err);
+        }
+      });
+
+      function showUpdateBanner(reg) {
+        const banner = document.getElementById('update-banner');
+        if (!banner) return;
+        banner.style.display = 'flex';
+        const btn = document.getElementById('btn-update-app');
+        btn.onclick = () => {
+          if (reg.waiting) {
+            reg.waiting.postMessage('SKIP_WAITING');
+          }
+          banner.style.display = 'none';
+        };
+      }
     }
   </script>
 </body>
