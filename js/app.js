@@ -40,33 +40,47 @@ const App = {
       e.target.value = formatted;
     });
 
-    // Bottom navigation
+    // Bottom nav se enlaza más abajo (versión endurecida)
+
+    // Quick actions & buttons with data-action (click + touch)
+    const handleAction = (e) => {
+      const el = e.target.closest('[data-action]');
+      if (!el) return;
+      const action = el.dataset.action;
+      if (!action) return;
+      e.preventDefault();
+      try {
+        if (action === 'new-client') this.openClientModal();
+        else if (action === 'new-budget') this.openBudgetModal();
+        else if (action === 'new-transaction') this.openTransactionModal();
+        else if (action === 'new-product') InventoryUI.openProductModal();
+        else if (action === 'new-purchase') {
+          const products = Storage.getProducts();
+          if (!products.length) return alert('Primero creá un producto');
+          // Si hay varios, pedir el primero con stock o listar
+          InventoryUI.openPurchaseModal(products[0].id);
+        }
+        else if (action === 'new-sale') InventoryUI.openSaleModal();
+        else if (action === 'pdf-products') InventoryUI.pdfProductList();
+      } catch (err) {
+        console.error(err);
+        alert('Error: ' + (err.message || err));
+      }
+    };
+    document.addEventListener('click', handleAction);
+
+    // Bottom nav - ensure works on mobile
     document.querySelectorAll('.nav-item').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
         const view = btn.dataset.view;
-        this.navigateTo(view);
+        if (view) this.navigateTo(view);
       });
     });
 
-    // Quick actions & buttons with data-action
-    document.addEventListener('click', (e) => {
-      const action = e.target.closest('[data-action]')?.dataset.action;
-      if (!action) return;
-
-      if (action === 'new-client') this.openClientModal();
-      if (action === 'new-budget') this.openBudgetModal();
-      if (action === 'new-transaction') this.openTransactionModal();
-      if (action === 'new-product') InventoryUI.openProductModal();
-      if (action === 'new-purchase') {
-        const products = Storage.getProducts();
-        if (!products.length) return alert('Primero creá un producto');
-        InventoryUI.openPurchaseModal(products[0].id);
-      }
-      if (action === 'new-sale') InventoryUI.openSaleModal();
-      if (action === 'pdf-products') InventoryUI.pdfProductList();
-    });
-
-    if (typeof InventoryUI !== 'undefined') InventoryUI.bind();
+    if (typeof InventoryUI !== 'undefined') {
+      try { InventoryUI.bind(); } catch (err) { console.error('InventoryUI.bind', err); }
+    }
 
     // Search
     document.getElementById('search-clients')?.addEventListener('input', (e) => {
@@ -154,10 +168,15 @@ const App = {
     if (view === 'budgets') this.renderBudgets();
     if (view === 'finance') this.renderFinance('income');
     if (view === 'settings') this.loadSettings();
-    if (view === 'products') InventoryUI.renderProducts();
-    if (view === 'sales') InventoryUI.renderSales();
-    if (view === 'people') InventoryUI.renderPeople();
-    if (view === 'more') InventoryUI.renderMoreStats();
+    try {
+      if (view === 'products') InventoryUI.renderProducts();
+      if (view === 'sales') InventoryUI.renderSales();
+      if (view === 'people') InventoryUI.renderPeople();
+      if (view === 'more') InventoryUI.renderMoreStats();
+    } catch (err) {
+      console.error('render view', view, err);
+      alert('Error al cargar la pantalla. Probá actualizar la app (borrá caché).\n' + (err.message || ''));
+    }
   },
 
   refreshDashboard() {
@@ -197,6 +216,30 @@ const App = {
       } else {
         heroSub.textContent = `Ventas del mes ${this.formatMoney(inv.totalSales)} · Ganancia ${this.formatMoney(inv.totalProfit)}`;
       }
+    }
+
+    // Recordatorios
+    const rem = document.getElementById('reminders-box');
+    if (rem) {
+      const inv = Storage.getStats();
+      const low = Storage.getLowStockProducts();
+      const exp = Storage.getExpiringProducts(30);
+      const debtors = Storage.getDebtors();
+      let rh = '';
+      if (low.length || exp.length || debtors.length) {
+        rh += '<p class="section-title">Recordatorios</p>';
+        low.slice(0, 3).forEach(p => {
+          const st = Storage.getProductStock(p);
+          rh += `<div class="alert alert-warn">⚠️ Stock bajo: <strong>${this.escape(p.name)}</strong> (${st} u., mín ${p.minStock || 0})</div>`;
+        });
+        exp.slice(0, 3).forEach(e => {
+          rh += `<div class="alert alert-danger">🗓️ Por vencer: <strong>${this.escape(e.productName)}</strong> — ${e.qty} u. el ${this.formatDate(e.expiryDate)}</div>`;
+        });
+        debtors.slice(0, 3).forEach(d => {
+          rh += `<div class="alert alert-warn">💸 Deuda: <strong>${this.escape(d.name)}</strong> — ${this.formatMoney(d.balance)}</div>`;
+        });
+      }
+      rem.innerHTML = rh;
     }
 
     // Recent budgets
@@ -648,12 +691,17 @@ const App = {
       this.refreshDashboard();
     }
 
-    if (this.editingType === 'product') InventoryUI.saveProduct();
-    if (this.editingType === 'purchase') InventoryUI.savePurchase();
-    if (this.editingType === 'sale') InventoryUI.saveSale();
-    if (this.editingType === 'supplier') InventoryUI.saveSupplier();
-    if (this.editingType === 'seller') InventoryUI.saveSeller();
-    if (this.editingType === 'debt') InventoryUI.saveDebtPayment();
+    try {
+      if (this.editingType === 'product') InventoryUI.saveProduct();
+      if (this.editingType === 'purchase') InventoryUI.savePurchase();
+      if (this.editingType === 'sale') InventoryUI.saveSale();
+      if (this.editingType === 'supplier') InventoryUI.saveSupplier();
+      if (this.editingType === 'seller') InventoryUI.saveSeller();
+      if (this.editingType === 'debt') InventoryUI.saveDebtPayment();
+    } catch (err) {
+      console.error(err);
+      alert('Error al guardar: ' + (err.message || err));
+    }
   },
 
   // Settings
@@ -662,6 +710,8 @@ const App = {
     document.getElementById('business-name').value = s.businessName || '';
     document.getElementById('business-phone').value = s.phone || '';
     document.getElementById('business-email').value = s.email || '';
+    const logoEl = document.getElementById('business-logo');
+    if (logoEl) logoEl.value = s.logoUrl || '';
     
     const key = License.getActivatedKey();
     document.getElementById('license-info').textContent = key 
@@ -673,7 +723,8 @@ const App = {
     Storage.saveSettings({
       businessName: document.getElementById('business-name').value.trim(),
       phone: document.getElementById('business-phone').value.trim(),
-      email: document.getElementById('business-email').value.trim()
+      email: document.getElementById('business-email').value.trim(),
+      logoUrl: (document.getElementById('business-logo')?.value || '').trim()
     });
     alert('Datos guardados');
   },
@@ -814,7 +865,7 @@ const App = {
   },
 
   // ========== GENERAR PDF DE PRESUPUESTO ==========
-  generateBudgetPDF(budgetId, options = {}) {
+  async generateBudgetPDF(budgetId, options = {}) {
     const budget = Storage.getBudgets().find(b => b.id === budgetId);
     if (!budget) {
       alert('No se encontró el presupuesto');
@@ -829,30 +880,43 @@ const App = {
     const margin = 18;
     let y = 20;
 
-    // Colores
-    const primary = [15, 118, 110]; // #0f766e
+    const primary = [15, 118, 110];
     const dark = [15, 23, 42];
     const muted = [100, 116, 139];
 
-    // Header barra
-    doc.setFillColor(...primary);
-    doc.rect(0, 0, pageWidth, 28, 'F');
-
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text(settings.businessName || 'Mi Negocio en Orden', margin, 14);
-
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    let headerInfo = [];
-    if (settings.phone) headerInfo.push(settings.phone);
-    if (settings.email) headerInfo.push(settings.email);
-    if (headerInfo.length) {
-      doc.text(headerInfo.join('  ·  '), margin, 22);
+    // Logo opcional
+    let logoData = null;
+    if (settings.logoUrl) {
+      try {
+        logoData = await this._loadImageData(settings.logoUrl);
+      } catch (e) { console.warn('Logo no cargó', e); }
     }
 
-    y = 40;
+    doc.setFillColor(...primary);
+    doc.rect(0, 0, pageWidth, 32, 'F');
+
+    if (logoData) {
+      try { doc.addImage(logoData, 'PNG', margin, 6, 18, 18); } catch (e) {}
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text(settings.businessName || 'Mi Negocio en Orden', margin + 22, 14);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      const hi = [settings.phone, settings.email].filter(Boolean).join('  ·  ');
+      if (hi) doc.text(hi, margin + 22, 22);
+    } else {
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text(settings.businessName || 'Mi Negocio en Orden', margin, 14);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      const hi = [settings.phone, settings.email].filter(Boolean).join('  ·  ');
+      if (hi) doc.text(hi, margin, 22);
+    }
+
+    y = 44;
 
     // Título
     doc.setTextColor(...dark);

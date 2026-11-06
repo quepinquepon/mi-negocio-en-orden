@@ -292,14 +292,15 @@ const InventoryUI = {
     App.editingType = 'sale';
     App.editingId = null;
     this._saleCart = [];
+    this._saleProducts = products;
 
     App.openModal('Nueva venta');
 
+    const cOpts = clients.map(c => `<option value="${c.id}">${App.escape(c.name)}</option>`).join('');
+    const sOpts = sellers.map(s => `<option value="${s.id}">${App.escape(s.name)}</option>`).join('');
     const pOpts = products.map(p =>
       `<option value="${p.id}" data-price="${p.salePrice || 0}" data-stock="${Storage.getProductStock(p)}">${App.escape(p.name)} (stock ${Storage.getProductStock(p)})</option>`
     ).join('');
-    const cOpts = clients.map(c => `<option value="${c.id}">${App.escape(c.name)}</option>`).join('');
-    const sOpts = sellers.map(s => `<option value="${s.id}">${App.escape(s.name)}</option>`).join('');
 
     document.getElementById('modal-body').innerHTML = `
       <div class="form-group"><label>Cliente</label>
@@ -308,8 +309,11 @@ const InventoryUI = {
         <select id="f-sseller"><option value="">—</option>${sOpts}</select></div>
 
       <p class="section-title">Agregar productos</p>
+      <div class="form-group"><label>Buscar producto</label>
+        <input type="search" id="f-ssearch" placeholder="Escribí nombre o código..." autocomplete="off" /></div>
       <div class="form-group"><label>Producto</label>
-        <select id="f-sproduct">${pOpts}</select></div>
+        <select id="f-sproduct" size="4" style="height:auto;min-height:110px">${pOpts}</select>
+        <p class="field-hint">Tocá un producto de la lista</p></div>
       <div style="display:flex;gap:8px">
         <div class="form-group" style="flex:1"><label>Cant.</label>
           <input type="number" id="f-sqty" min="1" value="1" /></div>
@@ -339,48 +343,63 @@ const InventoryUI = {
         <input type="text" id="f-snotes" placeholder="Opcional" /></div>
     `;
 
+    const fillProducts = (list) => {
+      const sel = document.getElementById('f-sproduct');
+      sel.innerHTML = list.map(p =>
+        `<option value="${p.id}" data-price="${p.salePrice || 0}" data-stock="${Storage.getProductStock(p)}">${App.escape(p.name)} (stock ${Storage.getProductStock(p)})</option>`
+      ).join('');
+      if (list.length) {
+        sel.selectedIndex = 0;
+        syncPrice();
+      }
+    };
+
     const syncPrice = () => {
       const sel = document.getElementById('f-sproduct');
       const opt = sel.options[sel.selectedIndex];
-      document.getElementById('f-sprice').value = opt?.dataset?.price || 0;
+      if (opt) document.getElementById('f-sprice').value = opt.dataset.price || 0;
     };
-    syncPrice();
+
     document.getElementById('f-sproduct').onchange = syncPrice;
+    document.getElementById('f-sproduct').onclick = syncPrice;
+    syncPrice();
+
+    document.getElementById('f-ssearch').oninput = (e) => {
+      const q = (e.target.value || '').toLowerCase().trim();
+      const filtered = !q ? this._saleProducts : this._saleProducts.filter(p =>
+        (p.name || '').toLowerCase().includes(q) || (p.sku || '').toLowerCase().includes(q)
+      );
+      fillProducts(filtered);
+    };
 
     document.getElementById('f-spay').onchange = () => {
       document.getElementById('partial-wrap').style.display =
         document.getElementById('f-spay').value === 'partial' ? 'block' : 'none';
     };
-
     document.getElementById('f-sgdisc').oninput = () => this._refreshSaleTotals();
 
     document.getElementById('btn-add-cart').onclick = () => {
       const sel = document.getElementById('f-sproduct');
       const opt = sel.options[sel.selectedIndex];
+      if (!opt) return alert('Elegí un producto');
       const productId = sel.value;
       const product = Storage.getProducts().find(p => p.id === productId);
       const qty = Number(document.getElementById('f-sqty').value) || 0;
       const unitPrice = Number(document.getElementById('f-sprice').value) || 0;
       const discountPercent = Number(document.getElementById('f-sdisc').value) || 0;
       const stock = Number(opt.dataset.stock) || 0;
-
       if (!product || qty <= 0) return alert('Cantidad inválida');
-
-      // Stock considerando lo ya cargado en el carrito
       const inCart = this._saleCart.filter(i => i.productId === productId).reduce((s, i) => s + i.qty, 0);
-      if (qty + inCart > stock) {
-        return alert('Stock insuficiente. Disponible: ' + (stock - inCart));
-      }
-
+      if (qty + inCart > stock) return alert('Stock insuficiente. Disponible: ' + (stock - inCart));
       this._saleCart.push({
-        productId,
-        productName: product.name,
-        qty,
-        unitPrice,
-        discountPercent,
+        productId, productName: product.name, qty, unitPrice, discountPercent,
         lineTotal: qty * unitPrice * (1 - discountPercent / 100)
       });
       this._renderSaleCart();
+      document.getElementById('f-sqty').value = 1;
+      document.getElementById('f-sdisc').value = 0;
+      document.getElementById('f-ssearch').value = '';
+      fillProducts(this._saleProducts);
     };
 
     this._renderSaleCart();
@@ -768,13 +787,18 @@ const InventoryUI = {
     const monthName = now.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
 
     doc.setFillColor(15, 118, 110);
-    doc.rect(0, 0, 210, 28, 'F');
+    doc.rect(0, 0, 210, 32, 'F');
     doc.setTextColor(255);
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     doc.text(settings.businessName || 'Mi Negocio en Orden', margin, 12);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    const hi = [settings.phone, settings.email].filter(Boolean).join(' · ');
+    if (hi) doc.text(hi, margin, 19);
     doc.setFontSize(11);
-    doc.text('Reporte de ganancias — ' + monthName, margin, 20);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Reporte de ganancias — ' + monthName, margin, 27);
 
     y = 40;
     doc.setTextColor(15, 23, 42);

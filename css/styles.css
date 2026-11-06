@@ -745,3 +745,24 @@ html, body {
 .alert-danger { background: #fee2e2; color: #991b1b; }
 
 .bottom-nav .nav-label { font-size: 0.65rem; }
+
+/* Fix botones táctiles */
+button, .btn, .nav-item, .chip, .btn-icon-label, .icon-btn {
+  touch-action: manipulation;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+}
+
+.bottom-nav {
+  z-index: 100;
+  pointer-events: auto;
+}
+
+.bottom-nav .nav-item {
+  pointer-events: auto;
+  min-height: 48px;
+}
+
+#reminders-box { margin-bottom: 8px; }
+#f-sproduct { width: 100%; font-size: 0.95rem; }

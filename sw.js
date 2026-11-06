@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mneo-v7';
+const CACHE_NAME = 'mneo-v9';
 const ASSETS = [
   './',
   './index.html',
